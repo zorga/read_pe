@@ -1,3 +1,5 @@
+// This program was made to parse PE file
+// Author: z0rga (zorganico@gmail.com)
 package main
 
 import (
@@ -61,7 +63,16 @@ func read_dos_stub_from_file (fp *os.File) {
     n, err := fp.Read(stub)
     check(err)
     //Print the entire content of stub bytes array:
+    fmt.Printf("DOS Stub:\n")
     fmt.Printf("%s", hex.Dump(stub[:n]))
+    //Get the address of the PE header:
+    fp.Seek(0x3C, 0)
+    pe_header_addr := make([]byte, 1)
+    _, err2 := fp.Read(pe_header_addr)
+    check(err2)
+    fmt.Printf("PE header is located at : %x", pe_header_addr)
+    //Print the PE header
+    //TODO
 }
 
 //From: http://zetcode.com/golang/readfile/
