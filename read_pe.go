@@ -43,7 +43,8 @@ func main() {
         f.Close()
         return
     }
-    read_dos_stub_from_file(f)
+    pe_h_offset := read_dos_stub_from_file(f)
+    read_pe_header_from_file(f, pe_h_offset)
     f.Close()
 }
 
@@ -60,7 +61,8 @@ func is_PE_file (fp *os.File) bool {
     return result
 }
 
-func read_dos_stub_from_file (fp *os.File) {
+// Print DOS stub and returns address of PE Header
+func read_dos_stub_from_file (fp *os.File) int64  {
     //Get the address of the PE header (this value is always located at 0x3C):
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
@@ -74,8 +76,9 @@ func read_dos_stub_from_file (fp *os.File) {
     check(err)
     fmt.Printf("DOS Stub:\n")
     fmt.Printf("%s", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
-    read_pe_header_from_file(fp, pe_h_offset)
-    return
+    //read_pe_header_from_file(fp, pe_h_offset)
+    fp.Seek(0, 0)
+    return pe_h_offset
 }
 
 func read_pe_header_from_file (fp *os.File, offset int64) {
