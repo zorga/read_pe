@@ -9,6 +9,7 @@ import (
     "encoding/hex"
     "encoding/binary"
     "time"
+    "io"
 )
 
 //From: https://stackoverflow.com/questions/23725924/can-gos-flag-package-print-usage
@@ -40,7 +41,8 @@ func main() {
         return
     }
     pe_h_offset := read_dos_stub_from_file(f, *boolStubPtr)
-    read_pe_header_from_file(f, pe_h_offset)
+    opt_hdr_offset := read_pe_header_from_file(f, pe_h_offset)
+    parse_optional_header(f, opt_hdr_offset)
     f.Close()
 }
 
@@ -57,7 +59,7 @@ func is_PE_file (fp *os.File) bool {
 }
 
 // Print DOS stub and returns address of PE Header (called "e_lfanew" field)
-func read_dos_stub_from_file (fp *os.File, sPrint bool) int64  {
+func read_dos_stub_from_file (fp *os.File, sPrint bool) int64 {
     //Get e_lfanew (this value is always located at 0x3C):
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
@@ -234,7 +236,8 @@ func get_characteristics (flags uint16) string {
     return result
 }
 
-func read_pe_header_from_file (fp *os.File, offset int64) {
+//Parse PE header and return offset to Optional Header
+func read_pe_header_from_file (fp *os.File, offset int64) int64 {
     //Signature Field:
     fp.Seek(offset, 0)
     pe_signature := make([]byte, 4) //PE signature is a 4-byte signature (0x00004550)
@@ -274,6 +277,24 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     flags := binary.LittleEndian.Uint16(chars)
     fmt.Printf("    Characteristics code: 0x%X\n", flags)
     fmt.Printf(get_characteristics(flags))
+    fmt.Printf("\n")
 
+    opt_hdr_offset, err := fp.Seek(0, io.SeekCurrent)
+    return opt_hdr_offset
+}
+
+func parse_optional_header (fp *os.File, offset int64) {
+    fmt.Printf("[PE OPTIONAL HEADER]\n")
+    fp.Seek(offset, 0)
+    magic := read_next_field(fp, 2) // Magic is uint16 (2-byte long)
+    iMagic := binary.LittleEndian.Uint16(magic)
+    arch := ""
+    switch iMagic {
+        case 0x10B:
+            arch = "PE32 (32 bit executable)"
+        case 0x20B:
+            arch = "PE32+ (64 bit executable)"
+    }
+    fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
     return
 }
