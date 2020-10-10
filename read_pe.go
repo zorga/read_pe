@@ -8,7 +8,9 @@ import (
     "os"
     "bufio"
     "encoding/hex"
+    //"encoding/binary"
     "io"
+    //"reflect"
 )
 
 //From: https://stackoverflow.com/questions/23725924/can-gos-flag-package-print-usage
@@ -27,6 +29,7 @@ func main() {
     flag.Usage = myUsage
     fptr := flag.String("fpath", "", "PE file")
     flag.Parse()
+    //Print usage if not enough arguments
     if len(os.Args) < 2 {
         flag.Usage()
         os.Exit(1)
@@ -45,6 +48,7 @@ func main() {
 }
 
 //Check the magic code to check if the file is a PE file
+//MS-DOS header begins with the magic code 0x5A4D
 func is_PE_file (fp *os.File) bool {
     magic := make([]byte, 2)
     _, err := fp.Read(magic)
@@ -57,7 +61,10 @@ func is_PE_file (fp *os.File) bool {
 }
 
 func read_dos_stub_from_file (fp *os.File) {
+    //Seek to the beginning of the file
     fp.Seek(0, 0)
+    //Standard stub is 128-bytes long
+    //but it can be customized, so need to write more robust code here
     stub := make([]byte, 128)
     //n: the number of bytes read
     n, err := fp.Read(stub)
@@ -68,11 +75,24 @@ func read_dos_stub_from_file (fp *os.File) {
     //Get the address of the PE header:
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
-    _, err2 := fp.Read(pe_header_addr)
+    _, err2 := fp.Read(pe_header_addr) //_ to ignore the number of bytes read
     check(err2)
-    fmt.Printf("PE header is located at : %x", pe_header_addr)
-    //Print the PE header
-    //TODO
+    fmt.Printf("PE header is located at : 0x%X\n", pe_header_addr[0])
+    //Convert from uint8 to int64
+    var pe_h_offset int64 = int64(pe_header_addr[0])
+    fmt.Printf("offset: %d\n", pe_h_offset)
+    read_pe_header_from_file(fp, pe_h_offset)
+    return
+}
+
+func read_pe_header_from_file (fp *os.File, offset int64) {
+    fp.Seek(offset, 0)
+    pe_signature := make([]byte, 4) //PE signature is a 4-byte signature (0x00004550)
+    _, err := fp.Read(pe_signature)
+    check(err)
+    fmt.Printf("PE signature: \n")
+    fmt.Printf("%s\n", hex.Dump(pe_signature))
+    return
 }
 
 //From: http://zetcode.com/golang/readfile/
