@@ -142,6 +142,7 @@ func get_machine_type (code uint16) string {
     return result
 }
 
+//TODO: Refactor this function
 func read_pe_header_from_file (fp *os.File, offset int64) {
     //Signature Field:
     fp.Seek(offset, 0)
@@ -151,6 +152,7 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     fmt.Printf("PE signature: \n")
     fmt.Printf("%s\n", hex.Dump(pe_signature))
 
+    fmt.Printf("PE Header Information:\n")
     //Machine Field:
     machine_field := make([]byte, 2) //Machine field is 2-byte long
     _, err2 := fp.Read(machine_field)
@@ -160,23 +162,52 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     code := binary.LittleEndian.Uint16(machine_field)
     //fmt.Println(code)
     //fmt.Printf("%X\n", code)
-    fmt.Printf("Machine type: %s\n", get_machine_type(code))
+    fmt.Printf("    Machine type: %s\n", get_machine_type(code))
 
     //Number of Sections:
     nSections := make([]byte, 2) // This field is 2-byte long
     _, err3 := fp.Read(nSections)
     check(err3)
     number := binary.LittleEndian.Uint16(nSections)
-    fmt.Printf("Number of sections: %d\n", number)
+    fmt.Printf("    Number of sections: %d\n", number)
 
     //TimeDateStamp:
     timestamp := make([]byte, 4) // This field is 4-byte long
     _, err4 := fp.Read(timestamp)
+    check(err4)
     bTime := binary.LittleEndian.Uint32(timestamp)
     t := time.Unix(int64(bTime), 0).UTC()
     strDate := t.Format(time.UnixDate)
-    fmt.Printf("Time Date Stamp: %s\n", strDate)
-    check(err4)
+    fmt.Printf("    Time Date Stamp: %s\n", strDate)
+
+    //PointerToSymbolTable:
+    ptrSymbolTable := make([]byte, 4) // This field is 4-byte long
+    _, err5 := fp.Read(ptrSymbolTable)
+    check(err5)
+    iPtr := binary.LittleEndian.Uint32(ptrSymbolTable)
+    fmt.Printf("    Pointer To Symbol Table: %d\n", iPtr)
+
+    //NumberOfSymbols:
+    nSymbols := make([]byte, 4) // This field is 4-byte long
+    _, err6 := fp.Read(nSymbols)
+    check(err6)
+    iSymbs := binary.LittleEndian.Uint32(nSymbols)
+    fmt.Printf("    Number Of Symbols: %d\n", iSymbs)
+
+    //SizeOfOptionalHeader:
+    optHeaderSize := make([]byte, 2) // This field is 2-byte long
+    _, err7 := fp.Read(optHeaderSize)
+    check(err7)
+    iOptHeaderSize := binary.LittleEndian.Uint16(optHeaderSize)
+    fmt.Printf("    Size Of Optional Header: %d\n", iOptHeaderSize)
+
+    //Characteristics:
+    chars := make([]byte, 2) // This field is 2-byte long
+    _, err8 := fp.Read(chars)
+    check(err8)
+    flags := binary.LittleEndian.Uint16(chars)
+    fmt.Printf("    Characteristics code: 0x%X\n", flags)
+
     return
 }
 
