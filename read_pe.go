@@ -10,6 +10,7 @@ import (
     "encoding/hex"
     "encoding/binary"
     "io"
+    "time"
     //"reflect"
 )
 
@@ -61,9 +62,9 @@ func is_PE_file (fp *os.File) bool {
     return result
 }
 
-// Print DOS stub and returns address of PE Header
+// Print DOS stub and returns address of PE Header (called "e_lfanew" field)
 func read_dos_stub_from_file (fp *os.File) int64  {
-    //Get the address of the PE header (this value is always located at 0x3C):
+    //Get e_lfanew (this value is always located at 0x3C):
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
     _, err2 := fp.Read(pe_header_addr) //_ to ignore the number of bytes read
@@ -75,7 +76,7 @@ func read_dos_stub_from_file (fp *os.File) int64  {
     n, err := fp.Read(stub)
     check(err)
     fmt.Printf("DOS Stub:\n")
-    fmt.Printf("%s", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
+    fmt.Printf("%s\n", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
     //read_pe_header_from_file(fp, pe_h_offset)
     fp.Seek(0, 0)
     return pe_h_offset
@@ -89,53 +90,53 @@ func get_machine_type (code uint16) string {
     switch code {
         case 0x0:
             result = "Any"
-        case 0xD301:
+        case 0x1D3:
             result = "Matsushita AM33"
-        case 0xC001:
+        case 0x1C0:
             result = "ARM little endian"
-        case 0x64AA:
+        case 0xAA64:
             result = "ARM64 little endian"
-        case 0xC401:
+        case 0x1C4:
             result = "ARM Thumb-2 little endian"
-        case 0xBC0E:
+        case 0xEBC:
             result = "EFI byte code"
-        case 0x4C01:
+        case 0x14C:
             result = "Intel 386 or later processors and compatible processors"
-        case 0x6486:
+        case 0x8664:
             result = "x64"
-        case 0x0002:
+        case 0x200:
             result = "Intel Itanium processor family"
-        case 0x4190:
+        case 0x9041:
             result = "Mitsubishi M32R little endian"
-        case 0x6602:
+        case 0x266:
             result = "MIPS16"
-        case 0x6603:
+        case 0x366:
             result = "MIPS with FPU"
-        case 0x6604:
+        case 0x466:
             result = "MIPS16 with FPU"
-        case 0xF001:
+        case 0x1F0:
             result = "Power PC little endian"
-        case 0xF101:
+        case 0x1F1:
             result = "Power PC with floating point support"
-        case 0x6601:
+        case 0x166:
             result = "MIPS little endian"
-        case 0x3250:
+        case 0x5032:
             result = "RISC-V 32-bit address space"
-        case 0x6450:
+        case 0x5064:
             result = "RISC-V 64-bit address space"
-        case 0x2851:
+        case 0x5128:
             result = "RISC-V 128-bit address space"
-        case 0xA201:
+        case 0x1A2:
             result = "Hitachi SH3"
-        case 0xA301:
+        case 0x1A3:
             result = "Hitachi SH3 DSP"
-        case 0xA601:
+        case 0x1A6:
             result = "Hitachi SH4"
-        case 0xA801:
+        case 0x1A8:
             result = "Hitachi SH5"
-        case 0xC201:
+        case 0x1C2:
             result = "Thumb"
-        case 0x6901:
+        case 0x169:
             result = "MIPS little-endian WCE v2"
     }
     return result
@@ -156,10 +157,26 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     check(err2)
     //fmt.Printf("Machine type: %X\n", machine_field)
     //fmt.Printf("Type: %s\n", reflect.TypeOf(machine_field))
-    code := binary.BigEndian.Uint16(machine_field)
-    //fmt.Println(data)
-    //fmt.Printf("%X\n", data)
+    code := binary.LittleEndian.Uint16(machine_field)
+    //fmt.Println(code)
+    //fmt.Printf("%X\n", code)
     fmt.Printf("Machine type: %s\n", get_machine_type(code))
+
+    //Number of Sections:
+    nSections := make([]byte, 2) // This field is 2-byte long
+    _, err3 := fp.Read(nSections)
+    check(err3)
+    number := binary.LittleEndian.Uint16(nSections)
+    fmt.Printf("Number of sections: %d\n", number)
+
+    //TimeDateStamp:
+    timestamp := make([]byte, 4) // This field is 4-byte long
+    _, err4 := fp.Read(timestamp)
+    bTime := binary.LittleEndian.Uint32(timestamp)
+    t := time.Unix(int64(bTime), 0).UTC()
+    strDate := t.Format(time.UnixDate)
+    fmt.Printf("Time Date Stamp: %s\n", strDate)
+    check(err4)
     return
 }
 
