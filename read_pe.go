@@ -25,20 +25,21 @@ func check(err error) {
 
 func main() {
     flag.Usage = myUsage
-    fptr := flag.String("fpath", "", "PE file")
+    fPtr := flag.String("f", "", "PE file")
+    boolStubPtr := flag.Bool("s", false, "Print DOS Stub [Optional]") 
     flag.Parse()
-    if len(os.Args) < 2 {
+    if *fPtr == "" {
         flag.Usage()
         os.Exit(1)
     }
-    f, err := os.Open(*fptr)
+    f, err := os.Open(*fPtr)
     check(err)
     if !is_PE_file(f) {
-        fmt.Println("This is not a PE file")
+        fmt.Println("This is not a PE file!!!")
         f.Close()
         return
     }
-    pe_h_offset := read_dos_stub_from_file(f)
+    pe_h_offset := read_dos_stub_from_file(f, *boolStubPtr)
     read_pe_header_from_file(f, pe_h_offset)
     f.Close()
 }
@@ -56,7 +57,7 @@ func is_PE_file (fp *os.File) bool {
 }
 
 // Print DOS stub and returns address of PE Header (called "e_lfanew" field)
-func read_dos_stub_from_file (fp *os.File) int64  {
+func read_dos_stub_from_file (fp *os.File, sPrint bool) int64  {
     //Get e_lfanew (this value is always located at 0x3C):
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
@@ -68,8 +69,10 @@ func read_dos_stub_from_file (fp *os.File) int64  {
     stub := make([]byte, pe_h_offset) //Read until the PE header which is located directly after the DOS stub
     n, err := fp.Read(stub)
     check(err)
-    fmt.Printf("DOS Stub:\n")
-    fmt.Printf("%s\n", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
+    if sPrint {
+        fmt.Printf("[DOS Stub]\n")
+        fmt.Printf("%s\n", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
+    }
     fp.Seek(0, 0)
     return pe_h_offset
 }
@@ -148,9 +151,9 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     pe_signature := make([]byte, 4) //PE signature is a 4-byte signature (0x00004550)
     _, err := fp.Read(pe_signature)
     check(err)
-    fmt.Printf("PE signature: \n")
+    fmt.Printf("[PE signature]\n")
     fmt.Printf("%s\n", hex.Dump(pe_signature))
-    fmt.Printf("PE Header Information:\n")
+    fmt.Printf("[PE Header Information]\n")
 
     machine_field := read_next_field(fp, 2)
     code := binary.LittleEndian.Uint16(machine_field)
