@@ -6,12 +6,9 @@ import (
     "fmt"
     "flag"
     "os"
-    "bufio"
     "encoding/hex"
     "encoding/binary"
-    "io"
     "time"
-    //"reflect"
 )
 
 //From: https://stackoverflow.com/questions/23725924/can-gos-flag-package-print-usage
@@ -30,15 +27,12 @@ func main() {
     flag.Usage = myUsage
     fptr := flag.String("fpath", "", "PE file")
     flag.Parse()
-    //Print usage if not enough arguments
     if len(os.Args) < 2 {
         flag.Usage()
         os.Exit(1)
     }
-
     f, err := os.Open(*fptr)
     check(err)
-    //dump_file(f)
     if !is_PE_file(f) {
         fmt.Println("This is not a PE file")
         f.Close()
@@ -50,7 +44,6 @@ func main() {
 }
 
 //Check the magic code to check if the file is a PE file
-//MS-DOS header begins with the magic code 0x5A4D
 func is_PE_file (fp *os.File) bool {
     magic := make([]byte, 2)
     _, err := fp.Read(magic)
@@ -77,7 +70,6 @@ func read_dos_stub_from_file (fp *os.File) int64  {
     check(err)
     fmt.Printf("DOS Stub:\n")
     fmt.Printf("%s\n", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
-    //read_pe_header_from_file(fp, pe_h_offset)
     fp.Seek(0, 0)
     return pe_h_offset
 }
@@ -142,7 +134,14 @@ func get_machine_type (code uint16) string {
     return result
 }
 
-//TODO: Refactor this function
+// Helper function to the read_pe_header_from_file function
+func read_next_field (fp *os.File, nByte int) []byte {
+    field := make([]byte, nByte) //Machine field is 2-byte long
+    _, err2 := fp.Read(field)
+    check(err2)
+    return field
+}
+
 func read_pe_header_from_file (fp *os.File, offset int64) {
     //Signature Field:
     fp.Seek(offset, 0)
@@ -151,80 +150,37 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     check(err)
     fmt.Printf("PE signature: \n")
     fmt.Printf("%s\n", hex.Dump(pe_signature))
-
     fmt.Printf("PE Header Information:\n")
-    //Machine Field:
-    machine_field := make([]byte, 2) //Machine field is 2-byte long
-    _, err2 := fp.Read(machine_field)
-    check(err2)
-    //fmt.Printf("Machine type: %X\n", machine_field)
-    //fmt.Printf("Type: %s\n", reflect.TypeOf(machine_field))
+
+    machine_field := read_next_field(fp, 2)
     code := binary.LittleEndian.Uint16(machine_field)
-    //fmt.Println(code)
-    //fmt.Printf("%X\n", code)
     fmt.Printf("    Machine type: %s\n", get_machine_type(code))
 
-    //Number of Sections:
-    nSections := make([]byte, 2) // This field is 2-byte long
-    _, err3 := fp.Read(nSections)
-    check(err3)
+    nSections := read_next_field(fp, 2)
     number := binary.LittleEndian.Uint16(nSections)
     fmt.Printf("    Number of sections: %d\n", number)
 
-    //TimeDateStamp:
-    timestamp := make([]byte, 4) // This field is 4-byte long
-    _, err4 := fp.Read(timestamp)
-    check(err4)
-    bTime := binary.LittleEndian.Uint32(timestamp)
+    timeDatestamp := read_next_field(fp, 4)
+    bTime := binary.LittleEndian.Uint32(timeDatestamp)
     t := time.Unix(int64(bTime), 0).UTC()
     strDate := t.Format(time.UnixDate)
     fmt.Printf("    Time Date Stamp: %s\n", strDate)
 
-    //PointerToSymbolTable:
-    ptrSymbolTable := make([]byte, 4) // This field is 4-byte long
-    _, err5 := fp.Read(ptrSymbolTable)
-    check(err5)
+    ptrSymbolTable := read_next_field(fp, 4)
     iPtr := binary.LittleEndian.Uint32(ptrSymbolTable)
     fmt.Printf("    Pointer To Symbol Table: %d\n", iPtr)
 
-    //NumberOfSymbols:
-    nSymbols := make([]byte, 4) // This field is 4-byte long
-    _, err6 := fp.Read(nSymbols)
-    check(err6)
+    nSymbols := read_next_field(fp, 4)
     iSymbs := binary.LittleEndian.Uint32(nSymbols)
     fmt.Printf("    Number Of Symbols: %d\n", iSymbs)
 
-    //SizeOfOptionalHeader:
-    optHeaderSize := make([]byte, 2) // This field is 2-byte long
-    _, err7 := fp.Read(optHeaderSize)
-    check(err7)
+    optHeaderSize := read_next_field(fp, 2)
     iOptHeaderSize := binary.LittleEndian.Uint16(optHeaderSize)
     fmt.Printf("    Size Of Optional Header: %d\n", iOptHeaderSize)
 
-    //Characteristics:
-    chars := make([]byte, 2) // This field is 2-byte long
-    _, err8 := fp.Read(chars)
-    check(err8)
+    chars := read_next_field(fp, 2)
     flags := binary.LittleEndian.Uint16(chars)
     fmt.Printf("    Characteristics code: 0x%X\n", flags)
 
     return
 }
-
-//From: http://zetcode.com/golang/readfile/
-func dump_file(fp *os.File) {
-    reader := bufio.NewReader(fp)
-    buf := make([]byte, 256)
-
-    for {
-        _, err := reader.Read(buf)
-        if err != nil {
-            if err != io.EOF {
-                fmt.Println(err)
-            }
-            break
-        }
-        fmt.Printf("%s", hex.Dump(buf))
-    }
-}
-
