@@ -61,26 +61,19 @@ func is_PE_file (fp *os.File) bool {
 }
 
 func read_dos_stub_from_file (fp *os.File) {
-    //Seek to the beginning of the file
-    fp.Seek(0, 0)
-    //Standard stub is 128-bytes long
-    //but it can be customized, so need to write more robust code here
-    stub := make([]byte, 128)
-    //n: the number of bytes read
-    n, err := fp.Read(stub)
-    check(err)
-    //Print the entire content of stub bytes array:
-    fmt.Printf("DOS Stub:\n")
-    fmt.Printf("%s", hex.Dump(stub[:n]))
-    //Get the address of the PE header:
+    //Get the address of the PE header (this value is always located at 0x3C):
     fp.Seek(0x3C, 0)
     pe_header_addr := make([]byte, 1)
     _, err2 := fp.Read(pe_header_addr) //_ to ignore the number of bytes read
     check(err2)
-    fmt.Printf("PE header is located at : 0x%X\n", pe_header_addr[0])
-    //Convert from uint8 to int64
-    var pe_h_offset int64 = int64(pe_header_addr[0])
-    fmt.Printf("offset: %d\n", pe_h_offset)
+    fmt.Printf("PE header starts at : 0x%X\n", pe_header_addr[0])
+    var pe_h_offset int64 = int64(pe_header_addr[0]) //Convert from uint8 to int64
+    fp.Seek(0, 0)
+    stub := make([]byte, pe_h_offset) //Read until the PE header which is located directly after the DOS stub
+    n, err := fp.Read(stub)
+    check(err)
+    fmt.Printf("DOS Stub:\n")
+    fmt.Printf("%s", hex.Dump(stub[:n])) //Print hex dump of the entire content of stub bytes array:
     read_pe_header_from_file(fp, pe_h_offset)
     return
 }
