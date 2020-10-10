@@ -37,6 +37,7 @@ func main() {
     check(err)
     if !is_PE_file(f) {
         fmt.Println("This is not a PE file!!!")
+        flag.Usage()
         f.Close()
         return
     }
@@ -48,11 +49,9 @@ func main() {
 
 //Check the magic code to check if the file is a PE file
 func is_PE_file (fp *os.File) bool {
-    magic := make([]byte, 2)
-    _, err := fp.Read(magic)
-    check(err)
+    magic := read_next_2byte_field(fp)
     result := false
-    if magic[0] == 0x4D && magic[1] == 0x5A {
+    if magic == 0x5A4D {
         result = true
     }
     return result
@@ -292,6 +291,47 @@ func read_pe_header_from_file (fp *os.File, offset int64) int64 {
     return opt_hdr_offset
 }
 
+func get_windows_subsystem(code uint16) string {
+    result := "Unknown"
+    switch code {
+        case 0:
+            result = "Unknown"
+        case 1:
+            result = "Device drivers and native Windows processes"
+        case 2:
+            result = "The Windows graphical user interface (GUI) subsystem"
+        case 3:
+            result = "The Windows character subsystem"
+        case 4:
+            result = "Unknown"
+        case 5:
+            result = "The OS/2 character subsystem"
+        case 6:
+            result = "Unknown"
+        case 7:
+            result = "The Posix character subsystem"
+        case 8:
+            result = "Native Win9x driver"
+        case 9:
+            result = "Windows CE"
+        case 10:
+            result = "An Extensible Firmware Interface (EFI) application"
+        case 11:
+            result = "An EFI driver with boot services"
+        case 12:
+            result = "An EFI driver with run-time services"
+        case 13:
+            result = "An EFI ROM image"
+        case 14:
+            result = "XBOX"
+        case 15:
+            result = "Unknown"
+        case 16:
+            result = "Windows boot application"
+    }
+    return result
+}
+
 func parse_optional_header (fp *os.File, offset int64) {
     fmt.Printf("[PE OPTIONAL HEADER]\n")
     fp.Seek(offset, 0)
@@ -304,18 +344,49 @@ func parse_optional_header (fp *os.File, offset int64) {
             arch = "PE32+ (64 bit executable)"
     }
     fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
-
     majLinkerVer := read_next_byte(fp) // (1-byte long)
     fmt.Printf("    Major Linker Version: %d\n", majLinkerVer)
-
     minLinkerVer := read_next_byte(fp)
     fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer)
-
     iSizeOfCode := read_next_4byte_field(fp)
     fmt.Printf("    Size of Code: 0x%X\n", iSizeOfCode)
-
     iSizeOfInitializedData := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfInitializedData)
-
+    fmt.Printf("    Size of Initialized Data: 0x%X\n", iSizeOfInitializedData)
+    iSizeOfUninitializedData := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfUninitializedData)
+    AddressOfEntryPoint := read_next_4byte_field(fp)
+    fmt.Printf("    Address of Entry Point (RVA): 0x%X\n", AddressOfEntryPoint)
+    BaseOfCode := read_next_4byte_field(fp)
+    fmt.Printf("    Base of Code: 0x%X\n", BaseOfCode)
+    BaseOfData := read_next_4byte_field(fp)
+    fmt.Printf("    Base of Data: 0x%X\n", BaseOfData)
+    ImageBase := read_next_4byte_field(fp)
+    fmt.Printf("    Image Base: 0x%X\n", ImageBase)
+    sectAlign := read_next_4byte_field(fp)
+    fmt.Printf("    Section Alignment: 0x%X\n", sectAlign)
+    FileAlign := read_next_4byte_field(fp)
+    fmt.Printf("    File Alignment: 0x%X\n", FileAlign)
+    MajOpSysVer := read_next_2byte_field(fp)
+    fmt.Printf("    Major Operating System Version: 0x%X\n", MajOpSysVer)
+    MinOpSysVer := read_next_2byte_field(fp)
+    fmt.Printf("    Minor Operating System Version: 0x%X\n", MinOpSysVer)
+    MajImgVer := read_next_2byte_field(fp)
+    fmt.Printf("    Major Image Version: 0x%X\n", MajImgVer)
+    MinImgVer := read_next_2byte_field(fp)
+    fmt.Printf("    Minor Image Version: 0x%X\n", MinImgVer)
+    MajSubSysVer := read_next_2byte_field(fp)
+    fmt.Printf("    Major Subsystem Version: 0x%X\n", MajSubSysVer)
+    MinSubSysVer := read_next_2byte_field(fp)
+    fmt.Printf("    Minor Subsystem Version: 0x%X\n", MinSubSysVer)
+    Win32VerValue := read_next_4byte_field(fp)
+    fmt.Printf("    Win32 Version Value: 0x%X\n", Win32VerValue)
+    SizeOfImage := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Image: 0x%X\n", SizeOfImage)
+    SizeOfHeaders := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Headers: 0x%X\n", SizeOfHeaders)
+    checksum := read_next_4byte_field(fp)
+    fmt.Printf("    Checksum: 0x%X\n", checksum)
+    subsystem := read_next_2byte_field(fp)
+    fmt.Printf("    Subsystem: %s\n", get_windows_subsystem(subsystem))
     return
 }
