@@ -145,6 +145,95 @@ func read_next_field (fp *os.File, nByte int) []byte {
     return field
 }
 
+func get_characteristics (flags uint16) string {
+    // Get the binary representation of flags:
+    // The bits that are set will tell us which characteristics is present.
+    // Ex: 0x10E in binary is 100001110
+    //     The Bits 1, 2, 3, and 8 are set 
+    //     Check the table at http://www.pelib.com/resources/luevel.txt to see what characteristics is activated
+    //fmt.Printf("%08b\n", flags)
+    result := ""
+    //flag_bin := strconv.FormatInt(int64(flags), 2)
+    //fmt.Printf("Binary repr of 0x%X : %s\n", flags, flag_bin)
+    //fmt.Printf("Size of flag_bin: %d\n", len(flag_bin))
+    //How to retrieve the bits we want: https://stackoverflow.com/questions/30158105/split-uint16-t-in-bits-in-c
+    bit0 := flags & 0x1
+    bit1 := (flags & 0x2) >> 1
+    bit2 := (flags & 0x4) >> 2
+    bit3 := (flags & 0x8) >> 3
+    bit4 := (flags & 0x10) >> 4
+    bit5 := (flags & 0x20) >> 5
+    bit6 := (flags & 0x40) >> 6
+    bit7 := (flags & 0x80) >> 7
+    bit8 := (flags & 0x100) >> 8
+    bit9 := (flags & 0x200) >> 9
+    bit10 := (flags & 0x400) >> 10
+    bit11 := (flags & 0x800) >> 11
+    bit12 := (flags & 0x1000) >> 12
+    bit13 := (flags & 0x2000) >> 13
+    bit14 := (flags & 0x4000) >> 14
+    bit15 := (flags & 0x8000) >> 15
+
+    if bit0 == 1 {
+        result += "        0x1: No relocation information\n"
+    }
+    if bit1 == 1 {
+        result += "        0x2: File is executable\n"
+    }
+    if bit2 == 1 {
+        result += "        0x4: Line numbers stripped\n"
+    }
+    if bit3 == 1 {
+        result += "        0x8: Local symbols stripped\n"
+    }
+    if bit4 == 1 {
+        result += "        0x10: Operating system is supposed to trim the working set of the running process by paging out\n"
+    }
+    if bit5 == 1 {
+        result += "        0x20: Application can handle > 2GB Addresses\n"
+    }
+    if bit6 == 1 {
+        result += "        0x40\n"
+    }
+    if bit7 == 1 {
+        result += "        0x80: Little Endian. Bytes must be swapped before reading\n"
+    }
+    if bit8 == 1 {
+        result += "        0x100: 32-bit word machine\n"
+    }
+    if bit9 == 1 {
+        result += "        0x200: Debugging information stripped\n"
+    }
+    if bit10 == 1 {
+        result += "        0x400: Application may not run from a removable medium\n"
+    }
+    if bit11 == 1 {
+        result += "        0x800: Application may not run from the network\n"
+    }
+    if bit12 == 1 {
+        result += "        0x1000: Application is a system file (eg. driver)\n"
+    }
+    if bit13 == 1 {
+        result += "        0x2000: The file is a DLL\n"
+    }
+    if bit14 == 1 {
+        result += "        0x4000: File should be run only on a uniprocessor machine\n"
+    }
+    if bit15 == 1 {
+        result += "        0x8000: Big Endiand\n"
+    }
+    //fmt.Printf("Value of Bit 0 : %d\n", bit0)
+    //fmt.Printf("Value of Bit 1 : %d\n", bit1)
+    //fmt.Printf("Value of Bit 2 : %d\n", bit2)
+    //fmt.Printf("Value of Bit 3 : %d\n", bit3)
+    //fmt.Printf("Value of Bit 4 : %d\n", bit4)
+    //fmt.Printf("Value of Bit 5 : %d\n", bit5)
+    //fmt.Printf("Value of Bit 6 : %d\n", bit6)
+    //fmt.Printf("Value of Bit 7 : %d\n", bit7)
+    //fmt.Printf("Value of Bit 8 : %d\n", bit8)
+    return result
+}
+
 func read_pe_header_from_file (fp *os.File, offset int64) {
     //Signature Field:
     fp.Seek(offset, 0)
@@ -184,6 +273,7 @@ func read_pe_header_from_file (fp *os.File, offset int64) {
     chars := read_next_field(fp, 2)
     flags := binary.LittleEndian.Uint16(chars)
     fmt.Printf("    Characteristics code: 0x%X\n", flags)
+    fmt.Printf(get_characteristics(flags))
 
     return
 }
