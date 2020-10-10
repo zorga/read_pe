@@ -139,14 +139,6 @@ func get_machine_type (code uint16) string {
     return result
 }
 
-// Helper function to the read_pe_header_from_file function
-func read_next_field (fp *os.File, nByte int) []byte {
-    field := make([]byte, nByte) //Machine field is 2-byte long
-    _, err2 := fp.Read(field)
-    check(err2)
-    return field
-}
-
 func get_characteristics (flags uint16) string {
     // Get the binary representation of flags:
     // The bits that are set will tell us which characteristics is present.
@@ -236,6 +228,14 @@ func get_characteristics (flags uint16) string {
     return result
 }
 
+// Helper function to the read_pe_header_from_file function
+func read_next_field (fp *os.File, nByte int) []byte {
+    field := make([]byte, nByte) //Machine field is 2-byte long
+    _, err2 := fp.Read(field)
+    check(err2)
+    return field
+}
+
 //Parse PE header and return offset to Optional Header
 func read_pe_header_from_file (fp *os.File, offset int64) int64 {
     //Signature Field:
@@ -296,5 +296,20 @@ func parse_optional_header (fp *os.File, offset int64) {
             arch = "PE32+ (64 bit executable)"
     }
     fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
+
+    majLinkerVer := read_next_field(fp, 1) // (1-byte long)
+    fmt.Printf("    Major Linker Version: %d\n", majLinkerVer[0])
+
+    minLinkerVer := read_next_field(fp, 1)
+    fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer[0])
+
+    sizeOfCode := read_next_field(fp, 4)
+    iSizeOfCode := binary.LittleEndian.Uint32(sizeOfCode)
+    fmt.Printf("    Size of Code: 0x%X\n", iSizeOfCode)
+
+    sizeOfInitializedData := read_next_field(fp, 4)
+    iSizeOfInitializedData := binary.LittleEndian.Uint32(sizeOfInitializedData)
+    fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfInitializedData)
+
     return
 }
