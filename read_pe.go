@@ -8,7 +8,7 @@ import (
     "os"
     "bufio"
     "encoding/hex"
-    //"encoding/binary"
+    "encoding/binary"
     "io"
     //"reflect"
 )
@@ -81,13 +81,85 @@ func read_dos_stub_from_file (fp *os.File) int64  {
     return pe_h_offset
 }
 
+// Returns the CPU type the PE file has to be ran on
+// Args: code retrieved from PE header
+// https://docs.microsoft.com/en-us/windows/win32/debug/pe-format#machine-types
+func get_machine_type (code uint16) string {
+    result := "Undefined"
+    switch code {
+        case 0x0:
+            result = "Any"
+        case 0xD301:
+            result = "Matsushita AM33"
+        case 0xC001:
+            result = "ARM little endian"
+        case 0x64AA:
+            result = "ARM64 little endian"
+        case 0xC401:
+            result = "ARM Thumb-2 little endian"
+        case 0xBC0E:
+            result = "EFI byte code"
+        case 0x4C01:
+            result = "Intel 386 or later processors and compatible processors"
+        case 0x6486:
+            result = "x64"
+        case 0x0002:
+            result = "Intel Itanium processor family"
+        case 0x4190:
+            result = "Mitsubishi M32R little endian"
+        case 0x6602:
+            result = "MIPS16"
+        case 0x6603:
+            result = "MIPS with FPU"
+        case 0x6604:
+            result = "MIPS16 with FPU"
+        case 0xF001:
+            result = "Power PC little endian"
+        case 0xF101:
+            result = "Power PC with floating point support"
+        case 0x6601:
+            result = "MIPS little endian"
+        case 0x3250:
+            result = "RISC-V 32-bit address space"
+        case 0x6450:
+            result = "RISC-V 64-bit address space"
+        case 0x2851:
+            result = "RISC-V 128-bit address space"
+        case 0xA201:
+            result = "Hitachi SH3"
+        case 0xA301:
+            result = "Hitachi SH3 DSP"
+        case 0xA601:
+            result = "Hitachi SH4"
+        case 0xA801:
+            result = "Hitachi SH5"
+        case 0xC201:
+            result = "Thumb"
+        case 0x6901:
+            result = "MIPS little-endian WCE v2"
+    }
+    return result
+}
+
 func read_pe_header_from_file (fp *os.File, offset int64) {
+    //Signature Field:
     fp.Seek(offset, 0)
     pe_signature := make([]byte, 4) //PE signature is a 4-byte signature (0x00004550)
     _, err := fp.Read(pe_signature)
     check(err)
     fmt.Printf("PE signature: \n")
     fmt.Printf("%s\n", hex.Dump(pe_signature))
+
+    //Machine Field:
+    machine_field := make([]byte, 2) //Machine field is 2-byte long
+    _, err2 := fp.Read(machine_field)
+    check(err2)
+    //fmt.Printf("Machine type: %X\n", machine_field)
+    //fmt.Printf("Type: %s\n", reflect.TypeOf(machine_field))
+    code := binary.BigEndian.Uint16(machine_field)
+    //fmt.Println(data)
+    //fmt.Printf("%X\n", data)
+    fmt.Printf("Machine type: %s\n", get_machine_type(code))
     return
 }
 
