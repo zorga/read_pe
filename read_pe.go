@@ -228,12 +228,28 @@ func get_characteristics (flags uint16) string {
     return result
 }
 
-// Helper function to the read_pe_header_from_file function
-func read_next_field (fp *os.File, nByte int) []byte {
-    field := make([]byte, nByte) //Machine field is 2-byte long
-    _, err2 := fp.Read(field)
-    check(err2)
-    return field
+// Helper functions to parse PE files 
+func read_next_4byte_field (fp *os.File) uint32 {
+    field := make([]byte, 4)
+    _, err := fp.Read(field)
+    check(err)
+    iField := binary.LittleEndian.Uint32(field)
+    return iField
+}
+
+func read_next_2byte_field (fp *os.File) uint16 {
+    field := make([]byte, 2)
+    _, err := fp.Read(field)
+    check(err)
+    iField := binary.LittleEndian.Uint16(field)
+    return iField
+}
+
+func read_next_byte (fp *os.File) byte {
+    myByte := make([]byte, 1)
+    _, err := fp.Read(myByte)
+    check(err)
+    return myByte[0]
 }
 
 //Parse PE header and return offset to Optional Header
@@ -247,34 +263,27 @@ func read_pe_header_from_file (fp *os.File, offset int64) int64 {
     fmt.Printf("%s\n", hex.Dump(pe_signature))
     fmt.Printf("[PE Header Information]\n")
 
-    machine_field := read_next_field(fp, 2)
-    code := binary.LittleEndian.Uint16(machine_field)
+    code := read_next_2byte_field(fp)
     fmt.Printf("    Machine type: %s\n", get_machine_type(code))
 
-    nSections := read_next_field(fp, 2)
-    number := binary.LittleEndian.Uint16(nSections)
+    number := read_next_2byte_field(fp)
     fmt.Printf("    Number of sections: %d\n", number)
 
-    timeDatestamp := read_next_field(fp, 4)
-    bTime := binary.LittleEndian.Uint32(timeDatestamp)
+    bTime := read_next_4byte_field(fp)
     t := time.Unix(int64(bTime), 0).UTC()
     strDate := t.Format(time.UnixDate)
     fmt.Printf("    Time Date Stamp: %s\n", strDate)
 
-    ptrSymbolTable := read_next_field(fp, 4)
-    iPtr := binary.LittleEndian.Uint32(ptrSymbolTable)
+    iPtr := read_next_4byte_field(fp)
     fmt.Printf("    Pointer To Symbol Table: %d\n", iPtr)
 
-    nSymbols := read_next_field(fp, 4)
-    iSymbs := binary.LittleEndian.Uint32(nSymbols)
+    iSymbs := read_next_4byte_field(fp)
     fmt.Printf("    Number Of Symbols: %d\n", iSymbs)
 
-    optHeaderSize := read_next_field(fp, 2)
-    iOptHeaderSize := binary.LittleEndian.Uint16(optHeaderSize)
+    iOptHeaderSize := read_next_2byte_field(fp)
     fmt.Printf("    Size Of Optional Header: %d\n", iOptHeaderSize)
 
-    chars := read_next_field(fp, 2)
-    flags := binary.LittleEndian.Uint16(chars)
+    flags := read_next_2byte_field(fp)
     fmt.Printf("    Characteristics code: 0x%X\n", flags)
     fmt.Printf(get_characteristics(flags))
     fmt.Printf("\n")
@@ -286,8 +295,7 @@ func read_pe_header_from_file (fp *os.File, offset int64) int64 {
 func parse_optional_header (fp *os.File, offset int64) {
     fmt.Printf("[PE OPTIONAL HEADER]\n")
     fp.Seek(offset, 0)
-    magic := read_next_field(fp, 2) // Magic is uint16 (2-byte long)
-    iMagic := binary.LittleEndian.Uint16(magic)
+    iMagic := read_next_2byte_field(fp)
     arch := ""
     switch iMagic {
         case 0x10B:
@@ -297,18 +305,16 @@ func parse_optional_header (fp *os.File, offset int64) {
     }
     fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
 
-    majLinkerVer := read_next_field(fp, 1) // (1-byte long)
-    fmt.Printf("    Major Linker Version: %d\n", majLinkerVer[0])
+    majLinkerVer := read_next_byte(fp) // (1-byte long)
+    fmt.Printf("    Major Linker Version: %d\n", majLinkerVer)
 
-    minLinkerVer := read_next_field(fp, 1)
-    fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer[0])
+    minLinkerVer := read_next_byte(fp)
+    fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer)
 
-    sizeOfCode := read_next_field(fp, 4)
-    iSizeOfCode := binary.LittleEndian.Uint32(sizeOfCode)
+    iSizeOfCode := read_next_4byte_field(fp)
     fmt.Printf("    Size of Code: 0x%X\n", iSizeOfCode)
 
-    sizeOfInitializedData := read_next_field(fp, 4)
-    iSizeOfInitializedData := binary.LittleEndian.Uint32(sizeOfInitializedData)
+    iSizeOfInitializedData := read_next_4byte_field(fp)
     fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfInitializedData)
 
     return
