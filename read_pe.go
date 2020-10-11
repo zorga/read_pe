@@ -138,6 +138,78 @@ func get_machine_type (code uint16) string {
     return result
 }
 
+//The implementation of this function is similar to "get_characteristics" function
+//TODO: make a helper function out of those two functions
+func get_dll_characteristics (flags uint16) string {
+    result := ""
+    bit0 := flags & 0x1
+    bit1 := (flags & 0x2) >> 1
+    bit2 := (flags & 0x4) >> 2
+    bit3 := (flags & 0x8) >> 3
+    bit4 := (flags & 0x10) >> 4
+    bit5 := (flags & 0x20) >> 5
+    bit6 := (flags & 0x40) >> 6
+    bit7 := (flags & 0x80) >> 7
+    bit8 := (flags & 0x100) >> 8
+    bit9 := (flags & 0x200) >> 9
+    bit10 := (flags & 0x400) >> 10
+    bit11 := (flags & 0x800) >> 11
+    bit12 := (flags & 0x1000) >> 12
+    bit13 := (flags & 0x2000) >> 13
+    bit14 := (flags & 0x4000) >> 14
+    bit15 := (flags & 0x8000) >> 15
+
+    if bit0 == 1 {
+        result += "        0x1: Should be zero: error\n"
+    }
+    if bit1 == 1 {
+        result += "        0x2: Should be zero: error\n"
+    }
+    if bit2 == 1 {
+        result += "        0x4: Should be zero: error\n"
+    }
+    if bit3 == 1 {
+        result += "        0x8: Should be zero: error\n"
+    }
+    if bit4 == 1 {
+        result += "        0x10: Undefined\n"
+    }
+    if bit5 == 1 {
+        result += "        0x20: Image can handle a high entropy 64-bit virtual address space.\n"
+    }
+    if bit6 == 1 {
+        result += "        0x40: DLL can be relocated at load time.\n"
+    }
+    if bit7 == 1 {
+        result += "        0x80: Code Integrity checks are enforced\n"
+    }
+    if bit8 == 1 {
+        result += "        0x100: Image is NX compatible\n"
+    }
+    if bit9 == 1 {
+        result += "        0x200: Isolation aware, but do not isolate the image.\n"
+    }
+    if bit10 == 1 {
+        result += "        0x400: Does not use structured exception (SE) handling. No SE handler may be called in this image.\n"
+    }
+    if bit11 == 1 {
+        result += "        0x800: Do not bind the image.\n"
+    }
+    if bit12 == 1 {
+        result += "        0x1000: Image must execute in an AppContainer.\n"
+    }
+    if bit13 == 1 {
+        result += "        0x2000: A WDM driver.\n"
+    }
+    if bit14 == 1 {
+        result += "        0x4000: Image supports Control Flow Guard.\n"
+    }
+    if bit15 == 1 {
+        result += "        0x8000: Terminal Server aware.\n"
+    }
+    return result
+}
+
 func get_characteristics (flags uint16) string {
     // Get the binary representation of flags:
     // The bits that are set will tell us which characteristics is present.
@@ -388,5 +460,8 @@ func parse_optional_header (fp *os.File, offset int64) {
     fmt.Printf("    Checksum: 0x%X\n", checksum)
     subsystem := read_next_2byte_field(fp)
     fmt.Printf("    Subsystem: %s\n", get_windows_subsystem(subsystem))
+    DllCharacteristics := read_next_2byte_field(fp)
+    fmt.Printf("    DLL Characteristics: 0x%X\n", DllCharacteristics)
+    fmt.Printf(get_dll_characteristics(DllCharacteristics))
     return
 }
