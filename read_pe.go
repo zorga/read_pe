@@ -27,23 +27,37 @@ func check(err error) {
 func main() {
     flag.Usage = myUsage
     fPtr := flag.String("f", "", "PE file")
-    boolStubPtr := flag.Bool("s", false, "Print DOS Stub [Optional]") 
+    boolAll := flag.Bool("a", false, "Parse and print the whole PE file [Optional]")
+    boolPeHdr := flag.Bool("p", false, "Print PE Header [Optional]")
+    boolPeOptHdr := flag.Bool("o", false, "Print PE Optional Header (if present) [Optional]")
+    boolStubPtr := flag.Bool("s", false, "Print DOS Stub [Optional]")
     flag.Parse()
+
     if *fPtr == "" {
         flag.Usage()
         os.Exit(1)
     }
     f, err := os.Open(*fPtr)
     check(err)
+
     if !is_PE_file(f) {
         fmt.Println("This is not a PE file!!!")
         flag.Usage()
         f.Close()
         return
     }
+
+    if *boolAll {
+        *boolPeHdr = true
+        *boolPeOptHdr = true
+        *boolStubPtr = true
+    }
+
+    //Everything happens here:
     pe_h_offset := read_dos_stub_from_file(f, *boolStubPtr)
-    opt_hdr_offset := read_pe_header_from_file(f, pe_h_offset)
-    parse_optional_header(f, opt_hdr_offset)
+    opt_hdr_offset := read_pe_header_from_file(f, pe_h_offset, *boolPeHdr)
+    parse_optional_header(f, opt_hdr_offset, *boolPeOptHdr)
+
     f.Close()
 }
 
@@ -64,7 +78,7 @@ func read_dos_stub_from_file (fp *os.File, sPrint bool) int64 {
     pe_header_addr := make([]byte, 1)
     _, err2 := fp.Read(pe_header_addr) //_ to ignore the number of bytes read
     check(err2)
-    fmt.Printf("PE header starts at : 0x%X\n", pe_header_addr[0])
+    //fmt.Printf("PE header starts at : 0x%X\n", pe_header_addr[0])
     var pe_h_offset int64 = int64(pe_header_addr[0]) //Convert from uint8 to int64
     fp.Seek(0, 0)
     stub := make([]byte, pe_h_offset) //Read until the PE header which is located directly after the DOS stub
@@ -324,40 +338,37 @@ func read_next_byte (fp *os.File) byte {
 }
 
 //Parse PE header and return offset to Optional Header
-func read_pe_header_from_file (fp *os.File, offset int64) int64 {
+func read_pe_header_from_file (fp *os.File, offset int64, bPrint bool) int64 {
     //Signature Field:
     fp.Seek(offset, 0)
     pe_signature := make([]byte, 4) //PE signature is a 4-byte signature (0x00004550)
     _, err := fp.Read(pe_signature)
     check(err)
-    fmt.Printf("[PE signature]\n")
-    fmt.Printf("%s\n", hex.Dump(pe_signature))
-    fmt.Printf("[PE Header Information]\n")
 
     code := read_next_2byte_field(fp)
-    fmt.Printf("    Machine type: %s\n", get_machine_type(code))
-
     number := read_next_2byte_field(fp)
-    fmt.Printf("    Number of sections: %d\n", number)
-
     bTime := read_next_4byte_field(fp)
     t := time.Unix(int64(bTime), 0).UTC()
     strDate := t.Format(time.UnixDate)
-    fmt.Printf("    Time Date Stamp: %s\n", strDate)
-
     iPtr := read_next_4byte_field(fp)
-    fmt.Printf("    Pointer To Symbol Table: %d\n", iPtr)
-
     iSymbs := read_next_4byte_field(fp)
-    fmt.Printf("    Number Of Symbols: %d\n", iSymbs)
-
     iOptHeaderSize := read_next_2byte_field(fp)
-    fmt.Printf("    Size Of Optional Header: %d\n", iOptHeaderSize)
-
     flags := read_next_2byte_field(fp)
-    fmt.Printf("    Characteristics code: 0x%X\n", flags)
-    fmt.Printf(get_characteristics(flags))
-    fmt.Printf("\n")
+
+    if bPrint {
+        fmt.Printf("[PE signature]\n")
+        fmt.Printf("%s\n", hex.Dump(pe_signature))
+        fmt.Printf("[PE Header Information]\n")
+        fmt.Printf("    Machine type: %s\n", get_machine_type(code))
+        fmt.Printf("    Number of sections: %d\n", number)
+        fmt.Printf("    Time Date Stamp: %s\n", strDate)
+        fmt.Printf("    Pointer To Symbol Table: %d\n", iPtr)
+        fmt.Printf("    Number Of Symbols: %d\n", iSymbs)
+        fmt.Printf("    Size Of Optional Header: %d\n", iOptHeaderSize)
+        fmt.Printf("    Characteristics code: 0x%X\n", flags)
+        fmt.Printf(get_characteristics(flags))
+        fmt.Printf("\n")
+    }
 
     opt_hdr_offset, err := fp.Seek(0, io.SeekCurrent)
     return opt_hdr_offset
@@ -404,8 +415,7 @@ func get_windows_subsystem(code uint16) string {
     return result
 }
 
-func parse_optional_header (fp *os.File, offset int64) {
-    fmt.Printf("[PE OPTIONAL HEADER]\n")
+func parse_optional_header (fp *os.File, offset int64, bPrint bool) {
     fp.Seek(offset, 0)
     iMagic := read_next_2byte_field(fp)
     arch := ""
@@ -415,65 +425,70 @@ func parse_optional_header (fp *os.File, offset int64) {
         case 0x20B:
             arch = "PE32+ (64 bit executable)"
     }
-    fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
+
     majLinkerVer := read_next_byte(fp) // (1-byte long)
-    fmt.Printf("    Major Linker Version: %d\n", majLinkerVer)
     minLinkerVer := read_next_byte(fp)
-    fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer)
     iSizeOfCode := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Code: 0x%X\n", iSizeOfCode)
     iSizeOfInitializedData := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Initialized Data: 0x%X\n", iSizeOfInitializedData)
     iSizeOfUninitializedData := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfUninitializedData)
     AddressOfEntryPoint := read_next_4byte_field(fp)
-    fmt.Printf("    Address of Entry Point (RVA): 0x%X\n", AddressOfEntryPoint)
     BaseOfCode := read_next_4byte_field(fp)
-    fmt.Printf("    Base of Code: 0x%X\n", BaseOfCode)
     BaseOfData := read_next_4byte_field(fp)
-    fmt.Printf("    Base of Data: 0x%X\n", BaseOfData)
     ImageBase := read_next_4byte_field(fp)
-    fmt.Printf("    Image Base: 0x%X\n", ImageBase)
     sectAlign := read_next_4byte_field(fp)
-    fmt.Printf("    Section Alignment: 0x%X\n", sectAlign)
     FileAlign := read_next_4byte_field(fp)
-    fmt.Printf("    File Alignment: 0x%X\n", FileAlign)
     MajOpSysVer := read_next_2byte_field(fp)
-    fmt.Printf("    Major Operating System Version: 0x%X\n", MajOpSysVer)
     MinOpSysVer := read_next_2byte_field(fp)
-    fmt.Printf("    Minor Operating System Version: 0x%X\n", MinOpSysVer)
     MajImgVer := read_next_2byte_field(fp)
-    fmt.Printf("    Major Image Version: 0x%X\n", MajImgVer)
     MinImgVer := read_next_2byte_field(fp)
-    fmt.Printf("    Minor Image Version: 0x%X\n", MinImgVer)
     MajSubSysVer := read_next_2byte_field(fp)
-    fmt.Printf("    Major Subsystem Version: 0x%X\n", MajSubSysVer)
     MinSubSysVer := read_next_2byte_field(fp)
-    fmt.Printf("    Minor Subsystem Version: 0x%X\n", MinSubSysVer)
     Win32VerValue := read_next_4byte_field(fp)
-    fmt.Printf("    Win32 Version Value: 0x%X\n", Win32VerValue)
     SizeOfImage := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Image: 0x%X\n", SizeOfImage)
     SizeOfHeaders := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Headers: 0x%X\n", SizeOfHeaders)
     checksum := read_next_4byte_field(fp)
-    fmt.Printf("    Checksum: 0x%X\n", checksum)
     subsystem := read_next_2byte_field(fp)
-    fmt.Printf("    Subsystem: %s\n", get_windows_subsystem(subsystem))
     DllCharacteristics := read_next_2byte_field(fp)
-    fmt.Printf("    DLL Characteristics: 0x%X\n", DllCharacteristics)
-    fmt.Printf(get_dll_characteristics(DllCharacteristics))
     sizeOfStackReserve := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Stack Reserve: 0x%X\n", sizeOfStackReserve)
     sizeOfStackCommit := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Stack Commit: 0x%X\n", sizeOfStackCommit)
     sizeOfHeapReserve := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Heap Reserve: 0x%X\n", sizeOfHeapReserve)
     sizeOfHeapCommit := read_next_4byte_field(fp)
-    fmt.Printf("    Size of Heap Commit: 0x%X\n", sizeOfHeapCommit)
     loaderFlags := read_next_4byte_field(fp)
-    fmt.Printf("    Loader Flags: 0x%X\n", loaderFlags)
     numberOfRVAandSizes := read_next_4byte_field(fp)
-    fmt.Printf("    Number of RVAs and Sizes: 0x%X\n", numberOfRVAandSizes)
+
+    if bPrint {
+        fmt.Printf("[PE OPTIONAL HEADER]\n")
+        fmt.Printf("    Magic: 0x%X, meaning: %s\n", iMagic, arch)
+        fmt.Printf("    Major Linker Version: %d\n", majLinkerVer)
+        fmt.Printf("    Minor Linker Version: %d\n", minLinkerVer)
+        fmt.Printf("    Size of Code: 0x%X\n", iSizeOfCode)
+        fmt.Printf("    Size of Initialized Data: 0x%X\n", iSizeOfInitializedData)
+        fmt.Printf("    Size of Uninitialized Data: 0x%X\n", iSizeOfUninitializedData)
+        fmt.Printf("    Address of Entry Point (RVA): 0x%X\n", AddressOfEntryPoint)
+        fmt.Printf("    Base of Code: 0x%X\n", BaseOfCode)
+        fmt.Printf("    Base of Data: 0x%X\n", BaseOfData)
+        fmt.Printf("    Image Base: 0x%X\n", ImageBase)
+        fmt.Printf("    Section Alignment: 0x%X\n", sectAlign)
+        fmt.Printf("    File Alignment: 0x%X\n", FileAlign)
+        fmt.Printf("    Major Operating System Version: 0x%X\n", MajOpSysVer)
+        fmt.Printf("    Minor Operating System Version: 0x%X\n", MinOpSysVer)
+        fmt.Printf("    Major Image Version: 0x%X\n", MajImgVer)
+        fmt.Printf("    Minor Image Version: 0x%X\n", MinImgVer)
+        fmt.Printf("    Major Subsystem Version: 0x%X\n", MajSubSysVer)
+        fmt.Printf("    Minor Subsystem Version: 0x%X\n", MinSubSysVer)
+        fmt.Printf("    Win32 Version Value: 0x%X\n", Win32VerValue)
+        fmt.Printf("    Size of Image: 0x%X\n", SizeOfImage)
+        fmt.Printf("    Size of Headers: 0x%X\n", SizeOfHeaders)
+        fmt.Printf("    Checksum: 0x%X\n", checksum)
+        fmt.Printf("    Subsystem: %s\n", get_windows_subsystem(subsystem))
+        fmt.Printf("    DLL Characteristics: 0x%X\n", DllCharacteristics)
+        fmt.Printf(get_dll_characteristics(DllCharacteristics))
+        fmt.Printf("    Size of Stack Reserve: 0x%X\n", sizeOfStackReserve)
+        fmt.Printf("    Size of Stack Commit: 0x%X\n", sizeOfStackCommit)
+        fmt.Printf("    Size of Heap Reserve: 0x%X\n", sizeOfHeapReserve)
+        fmt.Printf("    Size of Heap Commit: 0x%X\n", sizeOfHeapCommit)
+        fmt.Printf("    Loader Flags: 0x%X\n", loaderFlags)
+        fmt.Printf("    Number of RVAs and Sizes: 0x%X\n", numberOfRVAandSizes)
+    }
     return
 }
