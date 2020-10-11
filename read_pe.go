@@ -463,5 +463,17 @@ func parse_optional_header (fp *os.File, offset int64) {
     DllCharacteristics := read_next_2byte_field(fp)
     fmt.Printf("    DLL Characteristics: 0x%X\n", DllCharacteristics)
     fmt.Printf(get_dll_characteristics(DllCharacteristics))
+    sizeOfStackReserve := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Stack Reserve: 0x%X\n", sizeOfStackReserve)
+    sizeOfStackCommit := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Stack Commit: 0x%X\n", sizeOfStackCommit)
+    sizeOfHeapReserve := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Heap Reserve: 0x%X\n", sizeOfHeapReserve)
+    sizeOfHeapCommit := read_next_4byte_field(fp)
+    fmt.Printf("    Size of Heap Commit: 0x%X\n", sizeOfHeapCommit)
+    loaderFlags := read_next_4byte_field(fp)
+    fmt.Printf("    Loader Flags: 0x%X\n", loaderFlags)
+    numberOfRVAandSizes := read_next_4byte_field(fp)
+    fmt.Printf("    Number of RVAs and Sizes: 0x%X\n", numberOfRVAandSizes)
     return
 }
