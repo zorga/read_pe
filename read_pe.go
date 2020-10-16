@@ -1,5 +1,5 @@
 // This program was made to parse PE file
-// Author: z0rga (zorganico@gmail.com)
+// Author: Nicolas Ooghe - zorganico@gmail.com
 package main
 
 import (
